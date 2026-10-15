@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
   runApp(const MeuPlayerApp());
 }
 
@@ -18,7 +15,6 @@ class MeuPlayerApp extends StatelessWidget {
       title: 'XPlayer Interno',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        primaryColor: Colors.blue,
         scaffoldBackgroundColor: const Color(0xFF121212),
       ),
       home: const HomeScreen(),
@@ -49,7 +45,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _urlController = TextEditingController(
-    text: 'https://iptv-org.github.io/iptv/index.m3u', // Lista pública de exemplo para testes
+    text: 'https://iptv-org.github.io/iptv/index.m3u',
   );
   
   List<Canal> _canais = [];
@@ -119,10 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('XPlayer Interno - IPTV')),
+      appBar: AppBar(title: const Text('XPlayer Interno')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        chno: Column(
+        child: Column(
           children: [
             TextField(
               controller: _urlController,
@@ -144,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 10),
             Expanded(
               child: _canais.isEmpty
-                ? const Center(child: Text('Nenhum canal carregado. Insira a URL e clique em Carregar.'))
+                ? const Center(child: Text('Insira a URL e clique em Carregar.'))
                 : ListView.builder(
                     itemCount: _canais.length,
                     itemBuilder: (context, index) {
@@ -152,14 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Card(
                         color: const Color(0xFF1E1E1E),
                         child: ListTile(
-                          leading: canal.logoUrl.isNotEmpty
-                              ? Image.network(
-                                  canal.logoUrl,
-                                  width: 40,
-                                  height: 40,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.tv),
-                                )
-                              : const Icon(Icons.tv),
                           title: Text(canal.nome),
                           subtitle: Text(canal.categoria, style: const TextStyle(color: Colors.grey)),
                           trailing: const Icon(Icons.play_arrow, color: Colors.blue),
@@ -192,18 +180,24 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late final Player _player = Player();
-  late final VideoController _controller = VideoController(_player);
+  late VideoPlayerController _controller;
+  bool _inicializado = false;
 
   @override
   void initState() {
     super.initState();
-    _player.open(Media(widget.canal.streamUrl));
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.canal.streamUrl))
+      ..initialize().then((_) {
+        setState(() {
+          _inicializado = true;
+          _controller.play();
+        });
+      });
   }
 
   @override
   void dispose() {
-    _player.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -211,13 +205,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(widget.canal.nome),
-        backgroundColor: Colors.transparent,
-      ),
+      appBar: AppBar(title: Text(widget.canal.nome), backgroundColor: Colors.transparent),
       body: Center(
-        child: Video(controller: _controller),
+        child: _inicializado
+            ? AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            : const CircularProgressIndicator(),
       ),
     );
   }
-}1
+}
